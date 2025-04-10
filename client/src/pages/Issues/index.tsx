@@ -24,7 +24,7 @@ export const IssuesPage = () => {
                     return <p key={item.id} className="bg-gray-100 p-4 rounded-lg mb-2 font-medium">{item.title}</p>
                 })}
                 </ScrollArea>
-                <div className="text-end p-4">
+                <div className="text-end p-8">
                     <Button className="p-4 hover:bg-red-300 items-center" >Создать задачу</Button>
                 </div>
                 
