@@ -1,3 +1,4 @@
+import { Kanban } from "@/components/Kanban";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { fetchById } from "@/store/slices/boardsSlice";
 import { useEffect, useReducer } from "react";
@@ -12,14 +13,16 @@ export const BoardPage = ( ) => {
   useEffect(() => {
     if(id) {
       dispatch(fetchById(id))
-      console.log(selectedBoard)
     }
   }, [id, dispatch])
    
   const boardName = location.state.name
 
 
-  return <h1 className="font-semibold text-2xl">
-    {boardName}
-  </h1>
-  };
+  return (
+    <>
+      <h1>{boardName}</h1>
+      <Kanban tasksArr={selectedBoard || []}></Kanban>
+    </>
+  )
+};

@@ -22,7 +22,7 @@ interface BoardsState {
     item: IBoards[];
     status: 'idle' | 'loading' | 'succeeded' | 'failed';
     error: string | null;
-    selectedBoard: ITask | null;
+    selectedBoard: ITask[] | null;
     name: string;
 }
 

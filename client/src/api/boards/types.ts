@@ -16,11 +16,13 @@ export interface IAssigneeUserForTask {
     id: number;
 }
 
+export type TStatus = 'Backlog' | 'InProgress' | 'Done'
+
 export interface ITask {
     id: number;
     title: string;
     description: string;
     priority: 'Low' | 'Medium' | 'High';
-    status: 'Backlog' | 'InProgress' | 'Done';
+    status: TStatus;
     assignee?: IAssigneeUserForTask[]
 }
