@@ -3,6 +3,8 @@ import { fetchIssues } from "@/store/slices/issuesSlice";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const IssuesPage = () => {
     const { item } = useAppSelector((state) => state.issues)
@@ -14,23 +16,28 @@ export const IssuesPage = () => {
     }, [dispatch])
 
     return (
-        <div className="mx-4 min-h-full">
-            <div>
-                <input type="text" />
-                <input type="text" />
+       <div className="h-full flex flex-col px-4 py-2 gap-4">
+            <div className="flex gap-2">
+                <Input placeholder="поиск по названию"></Input>
+                <Input placeholder="фильтры"></Input>
             </div>
-                    <ScrollArea className="max-h-3/4  overflow-y-hidden p-4 mb-4">
-                {item.map((item) => {
-                    return <p key={item.id} className="bg-gray-100 p-4 rounded-lg mb-2 font-medium">{item.title}</p>
-                })}
-                </ScrollArea>
-                <div className="text-end p-8">
-                    <Button className="p-4 hover:bg-red-300 items-center" >Создать задачу</Button>
+            <div className="flex-1 overflow-auto mb-2">
+                <div className="flex flex-col gap-3">
+                {item.map((task) => (
+                    <Card>
+                        <CardContent>
+                            <p key={task.id}>{task.title}</p>
+                        </CardContent>
+                    </Card>
+                ))}
                 </div>
-                
+            </div>
             
-       
-        </div>
-        
+            <div className="flex justify-end mb-2">
+                <Button size={"lg"} variant={'default'} className="hover:bg-red-300">
+                    Создать задачу
+                </Button>
+            </div>
+       </div>
     )
 };

@@ -7,9 +7,12 @@ import { Outlet } from 'react-router-dom'
 function App() {
 
   return (
-    <div className='app'>
+    <div className='h-screen flex flex-col'>
       <NavBar></NavBar>
-      <Outlet />
+      <main className='flex-1 overflow-auto'>
+        <Outlet />
+      </main>
+      
     </div>
   )
 }
