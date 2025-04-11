@@ -1,5 +1,5 @@
 import { ITask, TStatus } from "@/api/boards/types"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { KanbanColumn } from "./KanbanColumn"
 import { DragDropContext } from '@hello-pangea/dnd'
 
@@ -7,6 +7,10 @@ import { DragDropContext } from '@hello-pangea/dnd'
 
 export const Kanban = ({ tasksArr }: { tasksArr: ITask[]}) => {
     const [tasks, setTasks] = useState(tasksArr);
+
+    useEffect(() => {
+        setTasks(tasksArr)
+    }, [tasksArr])
 
     const moveTask = (taskId: number, newStatus: TStatus) => {
         setTasks((prevTasks) => prevTasks.map((task) => task.id === taskId ? {...task, status: newStatus} : task))

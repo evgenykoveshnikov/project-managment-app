@@ -1,23 +1,26 @@
 import { Kanban } from "@/components/Kanban";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { fetchById } from "@/store/slices/boardsSlice";
+import { fetchBoards, fetchById } from "@/store/slices/boardsSlice";
 import { useEffect, useReducer } from "react";
 import { useLocation, useParams } from "react-router-dom";
 
 export const BoardPage = ( ) => {
-  const {id = '1'} = useParams()
+  const { id } = useParams()
   const dispatch = useAppDispatch();
-  const { selectedBoard } = useAppSelector((state) => state.boards)
-  const location = useLocation();
+  const { selectedBoard, item: allBoards } = useAppSelector((state) => state.boards)
+
+
+
 
   useEffect(() => {
     if(id) {
       dispatch(fetchById(id))
+      dispatch(fetchBoards())
     }
   }, [id, dispatch])
    
-  const boardName = location.state.name
-
+  const boardMeta = allBoards.find(board => board.name)
+  const boardName = boardMeta?.name || 'Нет названия';
 
   return (
     <>
