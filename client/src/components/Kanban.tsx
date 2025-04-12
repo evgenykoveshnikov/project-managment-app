@@ -2,6 +2,7 @@ import { ITask, TStatus } from "@/api/boards/types"
 import { useEffect, useState } from "react"
 import { KanbanColumn } from "./KanbanColumn"
 import { DragDropContext } from '@hello-pangea/dnd'
+import { IGetTasks } from "@/api/issues/types"
 
 
 

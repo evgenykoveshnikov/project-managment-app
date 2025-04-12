@@ -1,6 +1,7 @@
 import { Droppable } from "@hello-pangea/dnd";
 import { KanbanCard } from "./KanbanCard"
 import { ITask, TStatus } from "@/api/boards/types";
+import { IGetTasks } from "@/api/issues/types";
 
 
 interface KanbanColumnProps {

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 export const BoardsPage = () => {
-    const boards = useAppSelector((state) => state.boards.item);
+    const boards = useAppSelector((state) => state.boards.items);
     const dispatch = useAppDispatch()
 
     useEffect(() => {

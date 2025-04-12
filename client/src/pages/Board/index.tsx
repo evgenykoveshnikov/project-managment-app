@@ -7,7 +7,7 @@ import { useLocation, useParams } from "react-router-dom";
 export const BoardPage = ( ) => {
   const { id } = useParams()
   const dispatch = useAppDispatch();
-  const { selectedBoard, item: allBoards } = useAppSelector((state) => state.boards)
+  const { selectedBoard, items: allBoards } = useAppSelector((state) => state.boards)
 
 
 
@@ -25,7 +25,7 @@ export const BoardPage = ( ) => {
   return (
     <>
       <h1>{boardName}</h1>
-      <Kanban tasksArr={selectedBoard || []}></Kanban>
+      <Kanban tasksArr={selectedBoard.tasks || []}></Kanban>
     </>
   )
 };

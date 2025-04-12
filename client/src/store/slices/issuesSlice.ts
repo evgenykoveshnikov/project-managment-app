@@ -1,6 +1,8 @@
+import { TStatus, ITask, IAssigneeUserForTask } from "@/api/boards/types";
 import { issuesApi } from "@/api/issues";
-import { IGetTasks } from "@/api/issues/types";
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import {  CreateTaskPayload, IGetTasks, UpdateTaskPayload, UpdateTaskStatusPayload } from "@/api/issues/types";
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { RootState } from "../store";
 
 
 export const fetchIssues = createAsyncThunk(
@@ -11,17 +13,104 @@ export const fetchIssues = createAsyncThunk(
     }
 )
 
+export const createTask = createAsyncThunk<{ id: number, sentData: CreateTaskPayload}, CreateTaskPayload, { rejectedValue: string}>(
+    'issues/createTask',
+    async (taskData, { rejectWithValue }) => {
+        try {
+            const response = await issuesApi.createTask(taskData);
+            if (response.data && response.data.data && typeof response.data.data.id === 'number') {
+                return { id: response.data.data.id, sentData: taskData };
+            }
+            return rejectWithValue('Invalid API response for createTask');
+        } catch (error: any) {
+            console.log(error)
+        }
+    }
+)
+
+export const updateTask = createAsyncThunk<{ id: number, sentData: UpdateTaskPayload}, { id: number, data: UpdateTaskPayload}>(
+    'issues/updateTask',
+    async ({id, data}) => {
+        const response = await issuesApi.updateTask(id, data);
+        return {
+            id,
+            sentData: data
+        }
+    } 
+)
+
+export const updateTaskStatus = createAsyncThunk<{id: number, status: TStatus}, { id: number, data: UpdateTaskStatusPayload}>(
+    'issues/updateTaskStatus',
+    async ({ id, data }) => {
+        const response = await issuesApi.updateTaskStatus(id, data);
+        return {
+            id,
+            status: data.status
+        }
+    }
+)
+
 interface IssuesState {
-    item: IGetTasks[];
+    items: ITask[];
     status: 'idle' | 'loading' | 'succeeded' | 'failed';
     error: string | null;
+    assignees: IAssigneeUserForTask[];
+    assigneesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
+    assigneesError: string | null;
 }
 
 const initialState: IssuesState = {
-    item: [],
+    items: [],
     status: 'idle',
     error: null,
+    assignees: [],
+    assigneesStatus: 'idle',
+    assigneesError: null,
 };
+
+const createTaskFormPayload = (
+    payload: { id: number; sentData: CreateTaskPayload},
+    state: Readonly<RootState>
+): ITask | null => {
+    const { id, sentData } = payload;
+    const board = state.boards.items.find(b => b.id === sentData.boardId)
+
+    if (!board) {
+        console.error('not found')
+    }
+
+    const defaultStatus:TStatus = 'Backlog';
+
+    return {
+        id: id,
+        title: sentData.title,
+        description: sentData.description ?? null,
+        priority: sentData.priority,
+        status: defaultStatus,
+        assignee: sentData.assigneeId,
+        boardId: sentData.boardId,
+        boardName: board?.name ?? 'Unknown Board'
+    };
+}
+
+const updateTaskFromPayload = (existingTask: ITask, payload: { id: number; sentData: UpdateTaskPayload}, state: Readonly<RootState>): ITask => {
+    const { sentData } = payload;
+    const assignee = state.issues.assignees.find(a => a.id === sentData.assigneeId);
+
+    if (!assignee) {
+        console.error('not found')
+    }
+
+    return {
+        ...existingTask,
+        title: sentData.title,
+        description: sentData.description ?? null,
+        priority: sentData.priority,
+        status: sentData.status,
+        assignee: assignee ? { id: assignee.id, fullName: assignee.fullName, email: '', avatarUrl: ''} : null,
+        assigneeId: sentData.assigneeId
+    }
+}
 
 const issuesSlice = createSlice({
     name: 'issues',
@@ -32,15 +121,71 @@ const issuesSlice = createSlice({
             .addCase(fetchIssues.pending, (state) => {
                 state.status = 'loading'
             })
-            .addCase(fetchIssues.fulfilled, (state, action) => {
+            .addCase(fetchIssues.fulfilled, (state, action:PayloadAction<IGetTasks[]>) => {
                 state.status = 'succeeded';
-                state.item = action.payload;
+                state.items = action.payload.map(issue => ({
+                    id: issue.id,
+                    title: issue.title,
+                    description: issue.description,
+                    priority: issue.priority,
+                    status: issue.status,
+                    assigneeId: issue.assigneeId,
+                    boardId: issue.boardId,
+                    boardName: issue.boardName,
+                    assignee: issue.assignee ? {
+                        id: issue.assignee.id,
+                        fullName: issue.assignee.fullName,
+                        email: issue.assignee.email,
+                        avatarUrl: issue.assignee.avatarUrl,
+                    } as IAssigneeUserForTask
+                    : null,
+                }));
+                state.error = null;
             })
             .addCase(fetchIssues.rejected, (state, action) => {
                 state.status = 'failed';
-                state.error = action.error.message || 'Ошибка загрузки';
+                state.error = action.error as string || 'Ошибка загрузки';
             })
+            .addCase(createTask.pending, (state) => {
+                state.status = 'loading'
+            })
+            .addCase(createTask.fulfilled, (state) => {
+                state.status = 'idle'
+            })
+            .addCase(createTask.rejected, (state, action) => {
+                state.status = 'failed'
+                state.error = action.payload as string;
+            })
+            .addCase(updateTask.pending, (state) => {
+                state.status = 'loading';
+            })
+            .addCase(updateTask.fulfilled, (state, /* action */) => {
+                state.status = 'idle'; // Сбрасываем статус для refetch
+            })
+            .addCase(updateTask.rejected, (state, action) => {
+                state.status = 'failed';
+                state.error = action.payload as string;
+            })
+            // updateTaskStatus
+            .addCase(updateTaskStatus.pending, (state) => {
+                state.status = 'loading';
+            })
+            .addCase(updateTaskStatus.fulfilled, (state, action: PayloadAction<{ id: number; status: TStatus }>) => {
+                const index = state.items.findIndex(task => task.id === action.payload.id);
+                if (index !== -1) {
+                    state.items[index].status = action.payload.status; // Обновляем только статус
+                }
+                state.status = 'succeeded'; // Можно вернуть succeeded, т.к. операция проще
+                state.error = null;
+            })
+            .addCase(updateTaskStatus.rejected, (state, action) => {
+                state.status = 'failed';
+                state.error = action.payload as string;
+            })
+
     }
 });
+
+
 
 export default issuesSlice.reducer;
