@@ -1,3 +1,4 @@
+import { IAssigneeUsers, TaskDataForEdit } from './../../api/issues/types';
 import { TStatus, ITask, IAssigneeUserForTask } from "@/api/boards/types";
 import { issuesApi } from "@/api/issues";
 import {  CreateTaskPayload, IGetTasks, UpdateTaskPayload, UpdateTaskStatusPayload } from "@/api/issues/types";
@@ -50,13 +51,24 @@ export const updateTaskStatus = createAsyncThunk<{id: number, status: TStatus}, 
     }
 )
 
+export const getUsers = createAsyncThunk(
+    'issues/getAllUsers',
+    async () => {
+        const response = await issuesApi.getAssignees();
+        return response.data.data
+    }
+)
+
 interface IssuesState {
     items: ITask[];
     status: 'idle' | 'loading' | 'succeeded' | 'failed';
     error: string | null;
-    assignees: IAssigneeUserForTask[];
+    assignees: IAssigneeUsers[];
     assigneesStatus: 'idle' | 'loading' | 'succeeded' | 'failed';
     assigneesError: string | null;
+    isTaskDialogOpen: boolean;
+    taskToEdit: TaskDataForEdit | null;
+    isBoardLocked: boolean
 }
 
 const initialState: IssuesState = {
@@ -66,6 +78,9 @@ const initialState: IssuesState = {
     assignees: [],
     assigneesStatus: 'idle',
     assigneesError: null,
+    isTaskDialogOpen: false,
+    taskToEdit: null as TaskDataForEdit | null,
+    isBoardLocked: false,
 };
 
 const createTaskFormPayload = (
@@ -115,7 +130,25 @@ const updateTaskFromPayload = (existingTask: ITask, payload: { id: number; sentD
 const issuesSlice = createSlice({
     name: 'issues',
     initialState,
-    reducers: {},
+    reducers: {
+        openCreateTaskDialog(state) {
+            state.isTaskDialogOpen = true;
+            state.taskToEdit = null;
+        },
+        openEditTaskDialog(state, action: PayloadAction<TaskDataForEdit>) {
+            state.isTaskDialogOpen = true;
+            state.taskToEdit = action.payload;
+            state.isBoardLocked = false;
+        },
+        closeTaskDialog(state) {
+            state.isTaskDialogOpen = false;
+            state.taskToEdit = null;
+        },
+        setBoardLocked(state, action: PayloadAction<boolean>)  {
+            state.isBoardLocked = action.payload;
+        }
+
+    },
     extraReducers: (builder) => {
         builder
             .addCase(fetchIssues.pending, (state) => {
@@ -182,10 +215,24 @@ const issuesSlice = createSlice({
                 state.status = 'failed';
                 state.error = action.payload as string;
             })
+            .addCase(getUsers.pending, (state) => {
+                state.assigneesStatus = 'loading';
+                state.assigneesError = null;
+            })
+            .addCase(getUsers.fulfilled, (state, action: PayloadAction<IAssigneeUsers[]>) => {
+                state.assigneesStatus = 'succeeded';
+                state.assignees = action.payload;
+                state.assigneesError = null;
+            })
+            .addCase(getUsers.rejected, (state, action) => {
+                state.assigneesStatus ='failed';
+                state.assigneesError = action.payload ?? action.error.message ?? 'Ошибка загрузки исполнителей';
+                
+            })
 
     }
 });
 
 
-
+export const { openCreateTaskDialog, openEditTaskDialog, closeTaskDialog, setBoardLocked} = issuesSlice.actions;
 export default issuesSlice.reducer;

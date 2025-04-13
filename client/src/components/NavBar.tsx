@@ -1,7 +1,12 @@
 import { Link, NavLink } from "react-router-dom";
 import { Button } from "./ui/button";
+import { useAppDispatch } from "@/store/hooks";
+import { openCreateTaskDialog, setBoardLocked } from "@/store/slices/issuesSlice";
 
-export const NavBar = () => {
+export const NavBar = ({ onOpenCreateDialog }) => {
+    const dispatch = useAppDispatch();
+
+
     return (
         <div className="flex justify-between items-center  mb-4 shadow-2xs p-6">
             <nav>
@@ -12,7 +17,11 @@ export const NavBar = () => {
       `text-2xl font-semibold ${isActive ? 'text-red-400' : 'text-black'} hover:text-red-400`
     }>Проекты</NavLink>
             </nav>
-            <Button className="hover:bg-red-300" variant={"default"} size={"lg"}>Создать задачу</Button>
+            <Button className="hover:bg-red-300" variant={"default"} size={"lg"} onClick={() => {
+                console.log('Кнопку нажал');
+                dispatch(setBoardLocked(false))
+                dispatch(openCreateTaskDialog());
+            }}>Создать задачу</Button>
         </div>
     )
 }

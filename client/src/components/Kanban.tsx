@@ -3,11 +3,14 @@ import { useEffect, useState } from "react"
 import { KanbanColumn } from "./KanbanColumn"
 import { DragDropContext } from '@hello-pangea/dnd'
 import { IGetTasks } from "@/api/issues/types"
+import { useAppDispatch } from "@/store/hooks"
+import { updateTaskStatus } from "@/store/slices/issuesSlice"
 
 
 
 export const Kanban = ({ tasksArr }: { tasksArr: ITask[]}) => {
     const [tasks, setTasks] = useState(tasksArr);
+    const dispatch = useAppDispatch()
 
     useEffect(() => {
         setTasks(tasksArr)
@@ -30,6 +33,14 @@ export const Kanban = ({ tasksArr }: { tasksArr: ITask[]}) => {
     const taskId = parseInt(result.draggableId);
     const newStatus = destination.droppableId as TStatus;
     moveTask(taskId, newStatus)
+
+    dispatch(updateTaskStatus({
+        id: taskId,
+        data: {
+            status: newStatus
+        }
+    }))
+    
    }
 
    

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -39,6 +39,9 @@ import  { Toaster } from '../ui/sonner';
 
 import { taskFormSchema, TaskFormData, TaskPriorityEnum, TaskStatusEnum } from "./schemas/taskSchema";
 import type { TaskDataForEdit, BoardListItem, AssigneeListItem } from "@/api/issues/types";
+import { toast } from "sonner";
+import { useAppSelector } from "@/store/hooks";
+import { setBoardLocked } from "@/store/slices/issuesSlice";
 
 interface TaskFormDialogProps {
     children: React.ReactNode
@@ -54,9 +57,15 @@ interface TaskFormDialogProps {
 
 export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardIdFromContext, availableBoards, availableAssignees, onSubmitForm}: TaskFormDialogProps) => {
     const navigate = useNavigate()
-    const sonner = Toaster
     const isEditing = !!taskToEdit
+    boardIdFromContext = taskToEdit?.boardId ?? null
     const currentBoardId = isEditing ? taskToEdit.boardId : boardIdFromContext
+    const isBoardLocked = useAppSelector(state => state.issues.isBoardLocked)
+    const location = useLocation()
+
+    const isTasksPage = location.pathname.includes('/issues');
+
+    
 
     const form = useForm<TaskFormData>({
         resolver: zodResolver(taskFormSchema),
@@ -71,6 +80,8 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
         }
     })
 
+    const { isDirty } = form.formState
+
     useEffect(() => {
         if (isOpen) {
             form.reset({
@@ -83,42 +94,44 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
                 assigneeId: taskToEdit?.assignee ? String(taskToEdit.assignee.id) : undefined,
             })
         }
-    }, [taskToEdit, currentBoardId, isOpen, form])
+    }, [taskToEdit, currentBoardId, isOpen])
 
     const handleFormSubmit = async (data: TaskFormData) => {
-        console.log('Form Data Submitted:', data)
+        console.log('TaskFormDialog handlerFormSubmit: Calling onSubmitForm...')
+        let success = false;
 
-        const success = await onSubmitForm(data, isEditing)
-
+        try {
+          success = await onSubmitForm(data, isEditing)
+          console.log('TaskFormDialog handleFormSubmit: onSubmitForm returned:', success)
+        } catch (error) {
+          console.error('ERROR during await', error)
+          success = false
+        }
+         
+        
         if (success) {
+            console.log('TaskFormDialog handleFormSubmit: Success is true. Calling onClose()')
             onClose()
-            sonner({
-                title: 'Успех',
-                description: `Задача успешно ${isEditing ? 'обновлена' : 'создана'}.`,
-            })
+            
         } else {
-            sonner({
-                title: 'Ошибка',
-                description: `Не удалось ${isEditing ? 'обновить' : 'создать'} задачу.`,
-                variant: 'destructive',
-            })
+            console.log('Success is false NOT calling onClose()')
         }
     }
 
     const handleGoToBoard = () => {
-        if (taskToEdit?.boardId) {
+        if (taskToEdit?.boardId && taskToEdit.id) {
             onClose()
-            navigate(`/boards/${taskToEdit.boardId}`)
+            navigate(`/boards/${taskToEdit.boardId}?openTask=${taskToEdit.id}`)
         }
     }
 
-    const showGoToBoardButton = isEditing && !boardIdFromContext
-
+    const showGoToBoardButton = isEditing && isTasksPage;
+    console.log('TaskFormDialog isOpen prop:', isOpen)
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={onClose} >
             <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-[525px] bg-slate-400">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-[525px] bg-slate-400 outline-0 border-0">
+                <DialogHeader className="bg-amber-500">
                     <DialogTitle>{isEditing ? 'Редактирование задачи' : 'Создание задачи'}</DialogTitle>
                     <DialogDescription>
                         {isEditing ? 'Измените данные задачи' : 'Заполните информацию о новой задаче'}
@@ -128,9 +141,9 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
                     <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
                         <FormField control={form.control} name="title" render={({ field }) =>(
                             <FormItem>
-                                <FormLabel>Title</FormLabel>
+                                <FormLabel>Название</FormLabel>
                                 <FormControl>
-                                    <Input  placeholder="Введите название задачи" {...field} />
+                                    <Input  className={' ring-0 border-0 shadow-amber-400 focus:outline-amber-500 selection:bg-amber-400 focus-visible:ring-0'} placeholder="Введите название задачи" {...field} />
                                 </FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -146,20 +159,20 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
                         )} />
                         <FormField control={form.control} name="boardId" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Проект</FormLabel>
+                                <FormLabel>Проект *</FormLabel>
                                 <Select 
                                 onValueChange={field.onChange} 
-                                defaultValue={taskToEdit?.boardName} 
+                                defaultValue={currentBoardId ? String(currentBoardId): undefined} 
                                 value={field.value}
-                                required={true}>
+                                required={true}
+                                disabled={isBoardLocked}>
                                     <FormControl>
-                                        <SelectTrigger>
+                                        <SelectTrigger className="border-0 rounded-lg shadow-md transition-all active:ring-blue-400">
                                             <SelectValue placeholder="Выберите проект">
-                                              {availableBoards.find(board => board.id === Number(field.value))?.name ?? taskToEdit?.boardName ?? 'Выберите проект'}
                                             </SelectValue>
                                         </SelectTrigger>
                                     </FormControl>
-                                    <SelectContent>
+                                    <SelectContent className="bg-white rounded-lg shadow-lg mt-1 overflow-hidden transition-all max-h-56 overflow-y-auto transform-3d">
                                     {availableBoards.map((board) => (
                         <SelectItem key={board.id} value={String(board.id)}>
                           {board.name}
@@ -223,20 +236,19 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
               name="assigneeId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Исполнитель</FormLabel>
+                  <FormLabel>Исполнитель *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
                     value={field.value}
+                    required={true}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Выберите исполнителя (необязательно)" />
+                        <SelectValue placeholder="Выберите исполнителя " />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Опция "Не назначен" */}
-                      <SelectItem value={'1'}>Не назначен</SelectItem>
                       {availableAssignees.map((assignee) => (
                         <SelectItem key={assignee.id} value={String(assignee.id)}>
                           {assignee.fullName}
@@ -258,11 +270,9 @@ export const TaskFormDialog = ({children, isOpen , onClose,  taskToEdit, boardId
                 </div>
                 <div className="flex gap-2">
                     <DialogClose asChild>
-                        <Button type="button" variant={'outline'}>
-                            Отмена
-                        </Button>
+                        
                     </DialogClose>
-                    <Button type="submit" disabled={form.formState.isSubmitting}>
+                    <Button type="submit" disabled={form.formState.isSubmitting || !isDirty}>
                         {isEditing ? 'Обновить' : 'Создать'}
                     </Button>
                 </div>

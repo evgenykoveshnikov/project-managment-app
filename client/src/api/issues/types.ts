@@ -31,7 +31,7 @@ export interface TaskDataForEdit {
 
 export interface BoardListItem {
     id: number;
-    name: string
+    name: string;
 }
 
 export interface AssigneeListItem {
@@ -57,6 +57,17 @@ export interface UpdateTaskPayload {
 
 export interface UpdateTaskStatusPayload {
     status: TStatus;
+}
+
+export interface IAssigneeUsers {
+    avatarUrl: string;
+    description: string;
+    email: string;
+    fullName: string;
+    id: number;
+    tasksCount: number;
+    teamId: number;
+    teamName: string;
 }
 
 export interface CreateTaskResponce { id: number }

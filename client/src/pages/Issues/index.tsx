@@ -1,6 +1,6 @@
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { createTask, fetchIssues, updateTask } from "@/store/slices/issuesSlice";
-import { use, useEffect, useState } from "react";
+import { closeTaskDialog, createTask, fetchIssues, getUsers, openEditTaskDialog, updateTask } from "@/store/slices/issuesSlice";
+import { useMemo , useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -8,23 +8,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Toaster } from "@/components/ui/sonner";
 import { BoardListItem, CreateTaskPayload, TaskDataForEdit, UpdateTaskPayload } from "@/api/issues/types";
 import { fetchBoards } from "@/store/slices/boardsSlice";
-import { TaskFormData } from "@/components/form/schemas/taskSchema";
-import { create } from "domain";
+import { TaskFormData, TaskStatusEnum } from "@/components/form/schemas/taskSchema";
 import { ITask } from "@/api/boards/types";
 import { TaskFormDialog } from "@/components/form/TaskFormDialog";
+import { SelectContent, SelectTrigger, SelectValue } from "@radix-ui/react-select";
+import { Select, SelectItem } from '../../components/ui/select'
 
 export const IssuesPage = () => {
-    const { items: tasks, status: tasksStatus } = useAppSelector((state) => state.issues)
+    const { items: tasks, status: tasksStatus, isTaskDialogOpen, taskToEdit } = useAppSelector((state) => state.issues)
     const {items: boards, status: boardsStatus } = useAppSelector((state) => state.boards)
     const { assignees, assigneesStatus } = useAppSelector((state) => state.issues);
     const dispatch = useAppDispatch()
-    const { toast } = Toaster
-
-    const [taskToEdit, setTaskToEdit] = useState<TaskDataForEdit | null>(null);
     const isSubmittingForm = tasksStatus === 'loading'
 
-    
+    const [statusFilter, setStatusFilter] = useState<string>('')
+    const [boardFilter, setBoardFilter] = useState<string>('')
+    const [titleSearch, setTitleSearch] = useState<string>('')
+    const [assigneeSearch, setAssigneeSerach] = useState<string>('')
 
+    const statusOptions = [...TaskStatusEnum.options]
+
+    
+    const resolveBoardId = (task: ITask) => {
+        if (task.boardId === 0) {
+            return boards.find(board => board.name === task.boardName)?.id
+        }
+    }
 
     useEffect(() => {
         if (tasksStatus === 'idle') {
@@ -34,70 +43,64 @@ export const IssuesPage = () => {
         if (boardsStatus === 'idle') {
             dispatch(fetchBoards())
         }
-    }, [dispatch, boardsStatus])
 
-
-    const handleTaskSubmit = async (formData: TaskFormData, isEditing: boolean): Promise<boolean> => {
-        console.log('я срабатываю')
-        let resultAction;
-
-        if(isEditing && formData.id) {
-            const payload: UpdateTaskPayload = {
-                title: formData.title,
-                assigneeId: formData.assigneeId ? parseInt(formData.assigneeId, 10) : 0,
-                description: formData.description || null,
-                priority: formData.priority,
-                status: formData.status,
-            }
-            resultAction = await dispatch(updateTask({ id: formData.id, data: payload}));
-        } else {
-            
-            const payload: CreateTaskPayload = {
-                title: formData.title,
-                boardId: parseInt(formData.boardId, 10),
-                assigneeId: formData.assigneeId ? parseInt(formData.assigneeId, 10) : 0,
-                description: formData.description || null,
-                priority: formData.priority
-            }
-            resultAction = await dispatch(createTask(payload))
+        if (assigneesStatus === 'idle') {
+            dispatch(getUsers())
         }
+    }, [dispatch, boardsStatus, assigneesStatus])
 
-        if(updateTask.fulfilled.match(resultAction) || createTask.fulfilled.match(resultAction)) {
-            setTaskToEdit(null);
-            dispatch(fetchIssues())
-            toast({
-                title: 'успех',
-                description: `Задача успешно ${isEditing ? 'обновлена' : 'создана'}. Список будет обновлен.` 
-            })
+
+    const filteredTasks = useMemo(() => {
+        return tasks.filter(task => {
+            if (statusFilter && task.status !== statusFilter) {
+                return false;
+            }
+
+            const numericBoardFilter = boardFilter ? parseInt(boardFilter, 10) : null;
+            const taskBoardId = resolveBoardId(task);
+            if (numericBoardFilter !== null && taskBoardId !== numericBoardFilter) {
+                console.log(taskBoardId)
+                if(taskBoardId === undefined) console.warn(`Could not determine boardId ${task.id}`)
+                return false;
+            }
+
+            if (titleSearch && !task.title.toLowerCase().includes(titleSearch.toLowerCase())) {
+                return false;
+            }
+
+            if (assigneeSearch && !task.assignee?.fullName.toLowerCase().includes(assigneeSearch.toLowerCase())) {
+                if(!task.assignee) return false
+                
+                return false;
+            }
+
             return true;
-        } else {
-            const errorMessage = (resultAction.payload as string) || `Не удалось ${isEditing ? 'обновить' : 'создать'} задачу`;
-            toast({ title: 'Ошибка', description: errorMessage, variant: 'destructive' });
-            return false;
-        }
+        })
+    }, [tasks, statusFilter, boardFilter, titleSearch, assigneeSearch, boards])
+
+
+    const openCreateDialog = () => {
+        dispatch(openEditTaskDialog(null))
     }
 
+
     const openEditDialog = (task: ITask) => {
-        if (task.boardId === undefined || task.boardName === undefined) {
-            console.error("Task object is missing boardId or boardName:", task);
-             toast({ title: 'Ошибка', description: 'Недостаточно данных для редактирования задачи.', variant: 'destructive' });
-             return;
-        }
+        const correctedBoardId = Number(resolveBoardId(task))
+        console.log(correctedBoardId)
 
         const taskForEditing: TaskDataForEdit = {
             id: task.id,
             title: task.title,
             description: task.description,
-            boardId: task.boardId,
+            boardId: correctedBoardId,
             boardName: task.boardName,
             priority: task.priority,
             status: task.status,
             assignee: task.assignee
         }
 
-        setTaskToEdit(taskForEditing);
-        console.log(taskForEditing)
-    }
+        dispatch(openEditTaskDialog(taskForEditing))
+        }
 
     
 
@@ -106,11 +109,40 @@ export const IssuesPage = () => {
     
 
     return (
-       <div className="h-[calc(100vh-80px)] flex flex-col px-4 py-2 gap-4"> {/* Адаптируйте высоту */}
+    <div>
+        <div className="flex flex-wrap gap-4 mb-4 px-4">
+            <Input placeholder="Поиск по названи..." value={titleSearch} onChange={(e) => setTitleSearch(e.target.value)} className="max-w-sm bg-gray-600"/>
+            <Input placeholder="Поиск по исполнителю..." value={assigneeSearch} onChange={(e) => setAssigneeSerach(e.target.value)} className="max-w-sm"/>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px] bg-amber-700">
+                    <SelectValue placeholder='Фильтр по статусу'/>
+                </SelectTrigger>
+                <SelectContent className="bg-amber-600 rounded-3xl shadow-sm">
+                    {statusOptions.map((status) => (
+                        <SelectItem key={status} value={status}>
+                            {status}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select value={boardFilter} onValueChange={setBoardFilter}>
+                    <SelectTrigger className='w-[180px]'>
+                        <SelectValue placeholder='Фильтр по доске'/>
+                    </SelectTrigger>
+                    <SelectContent className="bg-amber-700 z-10">
+                        {boardListItem.map((board) => (
+                            <SelectItem key={board.id} value={String(board.id)}>
+                                {board.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+            </Select>
+        </div>
+        <div className="h-[calc(100vh-80px)] flex flex-col px-4 py-2 gap-4"> {/* Адаптируйте высоту */}
              {/* ... Заголовок, Фильтры ... */}
 
              <ScrollArea className="flex-grow h-0 min-h-0 mb-2 pr-4">
-                {tasks.map((task) => (
+                {filteredTasks.map((task) => (
                     <Card key={task.id} className="mb-2 cursor-pointer" onClick={() => openEditDialog(task)}>
                         <CardHeader>
                             <CardTitle>{task.title}</CardTitle>
@@ -118,17 +150,15 @@ export const IssuesPage = () => {
                         </CardHeader>
                     </Card>
                 ))}
-             </ScrollArea>
-            <TaskFormDialog 
-                isOpen={taskToEdit !== null}
-                onClose={() => setTaskToEdit(null)}
-                taskToEdit={taskToEdit}
-                availableAssignees={assignees}
-                availableBoards={boardListItem}
-                onSubmitForm={handleTaskSubmit}
-                isLoading={isSubmittingForm}>
-            <></>
-            </TaskFormDialog> 
+             </ScrollArea> 
         </div>
+        <div className="flex justify-end flex-shrink-0 pt-4 border-t">
+                        <Button size={"lg"} onClick={openCreateDialog}>
+                            {isSubmittingForm ? 'Загрузка...' : 'Создать задачу'}
+                        </Button>
+        </div>
+        
+    </div>
+       
     )
 };
