@@ -1,0 +1,59 @@
+# docker-compose.yml
+version: '3.8' 
+
+services:
+  # Сервис для клиента (Frontend - Node.js)
+  client:
+    # Имя контейнера, как в Makefile (необязательно, Compose сгенерирует свое)
+    container_name: avito-client-container
+    # Инструкции по сборке образа
+    build:
+      context: ./client # Путь к папке с Dockerfile клиента
+      dockerfile: Dockerfile # Имя Dockerfile (можно опустить, если имя стандартное)
+    # Проброс портов: <порт на хосте>:<порт внутри контейнера>
+    # Используем 5173 как внутренний порт, судя по Makefile
+    ports:
+      - "3000:5173"
+    # Монтирование локальной папки с кодом в контейнер для разработки
+    volumes:
+      # Монтируем исходный код клиента из локальной папки ./client в /app внутри контейнера
+      - ./client:/app
+      # Исключаем node_modules из монтирования, чтобы использовать установленные в контейнере
+      # Это предотвращает перезапись node_modules, установленных командой RUN npm install
+      - /app/node_modules
+    # Переопределение команды запуска (необязательно, если совпадает с CMD в Dockerfile)
+    # но явно указывает на режим разработки
+    command: npm run dev
+    # Переменные окружения (если нужны)
+    # environment:
+    #   - NODE_ENV=development
+      # Пример: URL для подключения к бэкенду (сервис 'server' доступен по имени)
+    #   - VITE_API_URL=http://server:8080 # или REACT_APP_API_URL, зависит от вашего фронтенда
+
+  # Сервис для сервера (Backend - Go)
+  server:
+    # Имя контейнера, как в Makefile (необязательно)
+    container_name: avito-backend-container
+    # Инструкции по сборке образа
+    build:
+      context: ./server # Путь к папке с Dockerfile сервера
+      dockerfile: Dockerfile # Имя Dockerfile
+    # Проброс портов: <порт на хосте>:<порт внутри контейнера>
+    ports:
+      - "8080:8080"
+    # Переопределение команды запуска (необязательно, если совпадает с CMD в Dockerfile)
+    # command: ["./main"] # Можно раскомментировать для явного указания
+    # Монтирование volumes (если нужно хранить данные, например, SQLite базу данных)
+    # volumes:
+    #   - ./data:/app/data # Пример: монтирование папки для данных
+    # Переменные окружения (если нужны)
+    # environment:
+    #   - DATABASE_URL=sqlite3:/app/data/mydatabase.db
+
+# Если вам нужно управлять постоянными данными (например, для SQLite базы в сервере),
+# можно определить именованные volumes здесь:
+# volumes:
+#   server_data:
+# И затем использовать его в сервисе server:
+# volumes:
+#   - server_data:/path/inside/container/where/data/is/stored
